@@ -1,0 +1,166 @@
+# pumpkin_area.py
+# 南瓜种植区域
+
+from utils_area import (
+	area,
+	area_init_attr,
+	area_get_attr,
+	area_set_attr,
+	area_count_blocks,
+	area_move_to_corner,
+)
+from utils_farming import farming_create_init_hook, farming_plant_if_needed
+from utils_point import point_subtract
+from utils_route import vector_get_path
+from utils_move import path_move_along_with_hook, path_move_along
+from utils_rect_allocator import rect_allocator_instance_get
+from utils_rect_allocator import rect_allocator_alloc
+
+
+def pumpkin_area(size, allocator=None):
+	# 创建南瓜区域
+	# size: (h, w)
+	if allocator == None:
+		allocator = rect_allocator_instance_get()
+
+	# 解析尺寸
+	h, w = size
+
+	# 分配空间
+	rect_id, rect = rect_allocator_alloc(allocator, h, w)
+
+	# 创建区域对象
+	a = area(rect_id, rect)
+	a["entity_type"] = Entities.Pumpkin
+	a["allocator"] = allocator
+
+	# 设置处理器
+	a["area_init"] = __pumpkin_area_init
+	a["area_processor"] = __pumpkin_area_process
+
+	# 初始化属性
+	area_init_attr(a, "harvestable", False)
+
+	return a
+
+
+def __pumpkin_area_init(area):
+	# 初始化实现
+	entity_type = area["entity_type"]
+
+	# 移动到左下角
+	area_move_to_corner(area, "bottom_left")
+
+	# 使用通用 init hook（最后所有格子都种上南瓜）
+	hook = farming_create_init_hook(entity_type)
+	path = area["corner_paths"][(get_pos_y(), get_pos_x())]
+	path_move_along_with_hook(path, hook, None, True)
+
+
+def __pumpkin_area_process(area):
+	# 处理实现
+	entity_type = area["entity_type"]
+	y, x, h, w = area["rect"]
+
+	# 创建局部 pending_check 集合
+	pending_check = set()
+
+	# 第一次扫描：移动到左下角
+	area_move_to_corner(area, "bottom_left")
+
+	# 遍历整个区域，初始化 pending_check
+	def __first_scan_hook(point, arg):
+		current_entity = get_entity_type()
+
+		if current_entity == Entities.Dead_Pumpkin:
+			# 死南瓜：清理并重新种植，加入 pending_check
+			harvest()
+			farming_plant_if_needed(entity_type)
+			pending_check.add(point)
+		elif current_entity == entity_type:
+			# 是南瓜
+			if can_harvest():
+				# 成熟南瓜：标记
+				area_set_attr(area, "harvestable", point, True)
+			else:
+				# 未成熟南瓜：加入 pending_check
+				pending_check.add(point)
+		else:
+			# 其他情况：清理并种植，加入 pending_check
+			if current_entity != None:
+				if can_harvest():
+					harvest()
+			farming_plant_if_needed(entity_type)
+			pending_check.add(point)
+
+	path = area["corner_paths"][(get_pos_y(), get_pos_x())]
+	path_move_along_with_hook(path, __first_scan_hook, None, True)
+
+	# 持续扫描 pending_check 直到全部成熟
+	while len(pending_check) > 0:
+		# 移动到第一个待检查格子
+		first_point = None
+		for p in pending_check:
+			first_point = p
+			break
+
+		if first_point == None:
+			break
+
+		# 移动到第一个点
+		current_pos = (get_pos_y(), get_pos_x())
+		vec = point_subtract(first_point, current_pos)
+		path = vector_get_path(vec)
+		path_move_along(path)
+
+		# 遍历 pending_check 中的格子
+		checked_points = []
+
+		for point in pending_check:
+			py, px = point
+
+			# 移动到目标格子
+			current_pos = (get_pos_y(), get_pos_x())
+			vec = point_subtract((py, px), current_pos)
+			path = vector_get_path(vec)
+			path_move_along(path)
+
+			# 检查当前实体
+			current_entity = get_entity_type()
+
+			if current_entity == Entities.Dead_Pumpkin:
+				# 死南瓜：清理并重新种植，保留在 pending_check
+				harvest()
+				farming_plant_if_needed(entity_type)
+			elif current_entity == entity_type:
+				# 是南瓜：检查是否成熟
+				if can_harvest():
+					area_set_attr(area, "harvestable", point, True)
+					checked_points.append(point)
+			else:
+				# 其他情况：清理并种植，保留在 pending_check
+				if current_entity != None:
+					if can_harvest():
+						harvest()
+				farming_plant_if_needed(entity_type)
+
+		# 从 pending_check 中移除已成熟的格子
+		for point in checked_points:
+			pending_check.remove(point)
+
+		# 如果没有任何格子成熟，pass 等待一瞬间，等下一轮
+		if len(checked_points) == 0:
+			pass
+
+	# 如果 pending_check 为空，说明全部成熟，收获并重新种植
+	if len(pending_check) == 0:
+		harvest()
+
+		# 立即重新种植下一波
+		area_move_to_corner(area, "bottom_left")
+
+		def __replant_hook(point, arg):
+			farming_plant_if_needed(entity_type)
+
+		path = area["corner_paths"][(get_pos_y(), get_pos_x())]
+		path_move_along_with_hook(path, __replant_hook, None, True)

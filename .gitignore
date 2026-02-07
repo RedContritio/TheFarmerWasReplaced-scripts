@@ -1,0 +1,8 @@
+# game files
+
+__builtins__.py
+save.json
+
+# cache files
+
+.mypy_cache/
