@@ -130,15 +130,27 @@ special_area = pumpkin_area((10, 10), allocator=custom_allocator)
 - `path_move_along_with_hook(path, hook, hook_arg, hook_for_start)` - 沿路径移动并执行 hook
   - hook 签名：`hook(point, hook_arg)`
   - 内部维护坐标，避免重复调用 `get_pos_y/x`
+- `route_move_along(route)` - 执行 route（先走到起点，再沿 path）
+  - `route` 形式：`(path, start_point)`
+  - “走到起点”的就位过程**不触发 hook**
+- `route_move_along_with_hook(route, hook, hook_arg, hook_for_start)` - 执行 route 并在遍历阶段触发 hook
+  - hook 只会在到达 `start_point` 后开始触发（解决就位阶段误触发）
 
 ### utils_route.py - 路径规划
 向量路径和哈密顿路径生成。
 
 **主要功能**：
 - `vector_get_path(vec)` - 获取简单路径（先 y 后 x）
-- `vector_get_hamiltonian_path(vec, mode)` - 获取哈密顿路径（蛇形遍历）
+- `rect_get_hamiltonian_path(rect, start_point, mode)` - 获取哈密顿 route
+  - 返回 `(path, route_start_point)`
+  - `path` **不包含**“从 start_point 走到 route_start_point”的就位段
+  - 建议使用 `route_move_along(_with_hook)` 执行（就位阶段不触发 hook）
   - `mode='snake_x'` - 横向蛇形
   - `mode='snake_y'` - 纵向蛇形
+  - `mode='spiral_outward_cw'` - 顺时针外旋螺旋（从中心往外）
+  - `mode='spiral_outward_ccw'` - 逆时针外旋螺旋
+  - `mode='spiral_inward_cw'` - 顺时针内旋螺旋（从角往内）
+  - `mode='spiral_inward_ccw'` - 逆时针内旋螺旋
 
 ### utils_direction.py - 方向工具
 方向和向量的转换（使用缓存优化）。
@@ -209,9 +221,14 @@ special_area = pumpkin_area((10, 10), allocator=custom_allocator)
 - 每轮立即 harvest + plant
 
 ### area_companion.py - 同伴区
-- 工厂函数：`companion_area(size, entities, allocator=None)`，size 为 `(h, w)`
+- 工厂函数：`companion_area(size, target_entity, allocator=None)`，size 为 `(h, w)`
+- `target_entity`：主作物实体类型（仅支持 `Entities.Grass`/`Entities.Bush`/`Entities.Tree`/`Entities.Carrot`；否则会随机替换并 `print` 提示）
 - 自动从全局分配器分配空间
-- 与 intercrop_area 逻辑相同，用于带同伴增益的混种
+- `init` / 每次 `process` 结束后保证区域内全为 `target_entity`
+- `process` 开始会从中心点螺旋向外遍历主作物，对每个主作物调用 `get_companion()` 决定要在何处种植何种“增益作物（slave）”
+  - `get_companion()` 返回 `(plant_type, (x, y))`，其中坐标是**绝对坐标**；代码内部会转换为 `(y, x)` 处理
+  - `get_companion()` 保证不会返回“同一个点”（不需要额外判断 `slave_point == master_point`）
+- 然后先收获所有主作物（会等待成熟），再清理所有 slave（不等待成熟），每次收获/清理后都补种 `target_entity`
 
 ### area_maze.py - 迷宫区域
 - 工厂函数：`maze_area(size, times, allocator=None)`，size 为 `(h, w)`

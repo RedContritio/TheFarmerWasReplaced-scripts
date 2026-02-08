@@ -54,3 +54,6 @@ def vector1d_x_to_direction(vec):
 
 def vector1d_y_to_direction(vec):
 	return __vector1d_y_to_direction_cache[vec]
+
+def vector_to_direction(vec):
+	return __vector2d_to_direction_cache[vec]

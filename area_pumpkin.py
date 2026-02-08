@@ -7,12 +7,13 @@ from utils_area import (
 	area_get_attr,
 	area_set_attr,
 	area_count_blocks,
-	area_move_to_corner,
+	area_move_to_nearest_corner,
+	area_move_to_point,
+	area_process_begin,
+	area_process_end,
 )
-from utils_farming import farming_create_init_hook, farming_plant_if_needed
-from utils_point import point_subtract
-from utils_route import vector_get_path
-from utils_move import path_move_along_with_hook, path_move_along
+from utils_farming import farming_create_init_hook, farming_plant_if_needed, farming_create_do_harvest
+from utils_move import route_move_along_with_hook
 from utils_rect_allocator import rect_allocator_instance_get
 from utils_rect_allocator import rect_allocator_alloc
 
@@ -31,6 +32,9 @@ def pumpkin_area(size, allocator=None):
 
 	# 创建区域对象
 	a = area(rect_id, rect)
+	a['area_type'] = 'pumpkin'
+	a['last_process_tick'] = 0
+	a['last_process_harvest'] = {}
 	a["entity_type"] = Entities.Pumpkin
 	a["allocator"] = allocator
 
@@ -48,16 +52,20 @@ def __pumpkin_area_init(area):
 	# 初始化实现
 	entity_type = area["entity_type"]
 
-	# 移动到左下角
-	area_move_to_corner(area, "bottom_left")
+	# 移动到最近顶点
+	area_move_to_nearest_corner(area)
 
 	# 使用通用 init hook（最后所有格子都种上南瓜）
 	hook = farming_create_init_hook(entity_type)
-	path = area["corner_paths"][(get_pos_y(), get_pos_x())]
-	path_move_along_with_hook(path, hook, None, True)
+	route = area["corner_paths"][(get_pos_y(), get_pos_x())]
+	route_move_along_with_hook(route, hook, None, True)
 
 
 def __pumpkin_area_process(area):
+	start_tick = area_process_begin(area)
+	harvest_dict = area['last_process_harvest']
+	do_harvest = farming_create_do_harvest(harvest_dict)
+
 	# 处理实现
 	entity_type = area["entity_type"]
 	y, x, h, w = area["rect"]
@@ -66,7 +74,7 @@ def __pumpkin_area_process(area):
 	pending_check = set()
 
 	# 第一次扫描：移动到左下角
-	area_move_to_corner(area, "bottom_left")
+	area_move_to_nearest_corner(area)
 
 	# 遍历整个区域，初始化 pending_check
 	def __first_scan_hook(point, arg):
@@ -74,7 +82,7 @@ def __pumpkin_area_process(area):
 
 		if current_entity == Entities.Dead_Pumpkin:
 			# 死南瓜：清理并重新种植，加入 pending_check
-			harvest()
+			do_harvest(Entities.Dead_Pumpkin)
 			farming_plant_if_needed(entity_type)
 			pending_check.add(point)
 		elif current_entity == entity_type:
@@ -89,12 +97,12 @@ def __pumpkin_area_process(area):
 			# 其他情况：清理并种植，加入 pending_check
 			if current_entity != None:
 				if can_harvest():
-					harvest()
+					do_harvest(current_entity)
 			farming_plant_if_needed(entity_type)
 			pending_check.add(point)
 
-	path = area["corner_paths"][(get_pos_y(), get_pos_x())]
-	path_move_along_with_hook(path, __first_scan_hook, None, True)
+	route = area["corner_paths"][(get_pos_y(), get_pos_x())]
+	route_move_along_with_hook(route, __first_scan_hook, None, True)
 
 	# 持续扫描 pending_check 直到全部成熟
 	while len(pending_check) > 0:
@@ -108,29 +116,21 @@ def __pumpkin_area_process(area):
 			break
 
 		# 移动到第一个点
-		current_pos = (get_pos_y(), get_pos_x())
-		vec = point_subtract(first_point, current_pos)
-		path = vector_get_path(vec)
-		path_move_along(path)
+		area_move_to_point(first_point)
 
 		# 遍历 pending_check 中的格子
 		checked_points = []
 
 		for point in pending_check:
-			py, px = point
-
 			# 移动到目标格子
-			current_pos = (get_pos_y(), get_pos_x())
-			vec = point_subtract((py, px), current_pos)
-			path = vector_get_path(vec)
-			path_move_along(path)
+			area_move_to_point(point)
 
 			# 检查当前实体
 			current_entity = get_entity_type()
 
 			if current_entity == Entities.Dead_Pumpkin:
 				# 死南瓜：清理并重新种植，保留在 pending_check
-				harvest()
+				do_harvest(Entities.Dead_Pumpkin)
 				farming_plant_if_needed(entity_type)
 			elif current_entity == entity_type:
 				# 是南瓜：检查是否成熟
@@ -141,7 +141,7 @@ def __pumpkin_area_process(area):
 				# 其他情况：清理并种植，保留在 pending_check
 				if current_entity != None:
 					if can_harvest():
-						harvest()
+						do_harvest(current_entity)
 				farming_plant_if_needed(entity_type)
 
 		# 从 pending_check 中移除已成熟的格子
@@ -154,13 +154,15 @@ def __pumpkin_area_process(area):
 
 	# 如果 pending_check 为空，说明全部成熟，收获并重新种植
 	if len(pending_check) == 0:
-		harvest()
+		do_harvest(entity_type)
 
 		# 立即重新种植下一波
-		area_move_to_corner(area, "bottom_left")
+		area_move_to_nearest_corner(area)
 
 		def __replant_hook(point, arg):
 			farming_plant_if_needed(entity_type)
 
-		path = area["corner_paths"][(get_pos_y(), get_pos_x())]
-		path_move_along_with_hook(path, __replant_hook, None, True)
+		route = area["corner_paths"][(get_pos_y(), get_pos_x())]
+		route_move_along_with_hook(route, __replant_hook, None, True)
+
+	area_process_end(area, start_tick)

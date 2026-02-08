@@ -5,7 +5,10 @@ from utils_area import (
 	area,
 	area_init_attr,
 	area_get_attr,
-	area_set_attr
+	area_set_attr,
+	area_move_to_point,
+	area_process_begin,
+	area_process_end
 )
 from utils_maze import (
 	DIRECTIONS,
@@ -21,6 +24,7 @@ from utils_move import path_move_along
 from utils_direction import direction_negate
 from utils_rect_allocator import rect_allocator_instance_get
 from utils_rect_allocator import rect_allocator_alloc
+from utils_farming import farming_create_do_harvest
 
 def maze_area(size, times, allocator=None):
 	# 创建迷宫区域
@@ -34,10 +38,17 @@ def maze_area(size, times, allocator=None):
 	w = h
 	
 	# 分配空间
-	rect_id, rect = rect_allocator_alloc(allocator, h, w)
+	alloc = rect_allocator_alloc(allocator, h, w)
+	if alloc == None:
+		print("maze_area: alloc failed", h, w)
+		return None
+	rect_id, rect = alloc
 	
 	# 创建区域对象
 	a = area(rect_id, rect)
+	a['area_type'] = 'maze'
+	a['last_process_tick'] = 0
+	a['last_process_harvest'] = {}
 	a['allocator'] = allocator
 	
 	y, x, h, w = rect
@@ -219,14 +230,20 @@ def __maze_area_init(area):
 		use_item(Items.Weird_Substance, cost)
 
 def __maze_area_process(area):
+	start_tick = area_process_begin(area)
+	harvest_dict = area['last_process_harvest']
+	do_harvest = farming_create_do_harvest(harvest_dict)
+
 	# 处理迷宫区域
 	if area['times'] <= 0:
+		area_process_end(area, start_tick)
 		return
 	
 	# 检查是否已经是迷宫
 	entity_type = get_entity_type()
 	if entity_type != Entities.Hedge and entity_type != Entities.Treasure:
 		# 还未创建迷宫，需要先 init
+		area_process_end(area, start_tick)
 		return
 	
 	# 第一轮：全图探索建模
@@ -258,6 +275,7 @@ def __maze_area_process(area):
 		quick_print('规划路径花了', plan_tick, 'ticks')
 		
 		if path == None:
+			area_process_end(area, start_tick)
 			return
 		
 		# 边走边启发式优化
@@ -270,9 +288,11 @@ def __maze_area_process(area):
 		quick_print('寻路移动花了', move_tick, 'ticks')
 		
 		if not ok:
+			area_process_end(area, start_tick)
 			return
 		
 		if get_entity_type() != Entities.Treasure:
+			area_process_end(area, start_tick)
 			return
 		
 		# 找到宝箱
@@ -280,7 +300,8 @@ def __maze_area_process(area):
 		quick_print('还需要找', area['times'], '次宝箱')
 		
 		if area['times'] == 0:
-			harvest()
+			do_harvest(Entities.Treasure)
+			area_process_end(area, start_tick)
 		else:
 			use_item(Items.Weird_Substance, area['cost'])
 			
@@ -292,3 +313,6 @@ def __maze_area_process(area):
 					for d in DIRECTIONS:
 						if area_get_attr(area, d, block) == False:
 							area_set_attr(area, d, block, None)
+
+	# 理论上不会走到这里（times==0 会在上面 end），但保持一致
+	area_process_end(area, start_tick)

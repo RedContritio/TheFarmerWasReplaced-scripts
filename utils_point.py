@@ -40,5 +40,3 @@ def point_subtract(current, base):
 def vector_subtract(current, base):
 	return (current[0] - base[0], current[1] - base[1])
 
-def vector_to_direction(vec):
-	return __point_to_direction_cache[vec]

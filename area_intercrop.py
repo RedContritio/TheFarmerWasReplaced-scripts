@@ -4,13 +4,16 @@
 from utils_area import (
 	area,
 	area_init_attr,
-	area_move_to_corner
+	area_move_to_nearest_corner,
+	area_process_begin,
+	area_process_end
 )
 from utils_farming import (
 	farming_create_init_hook_with_selector,
-	farming_create_intercrop_process_hook
+	farming_create_intercrop_process_hook,
+	farming_create_do_harvest
 )
-from utils_move import path_move_along_with_hook
+from utils_move import route_move_along_with_hook
 from utils_rect_allocator import rect_allocator_instance_get
 from utils_rect_allocator import rect_allocator_alloc
 
@@ -33,6 +36,9 @@ def intercrop_area(size, entities=None, allocator=None):
 	
 	# 创建区域对象
 	a = area(rect_id, rect)
+	a['area_type'] = 'intercrop'
+	a['last_process_tick'] = 0
+	a['last_process_harvest'] = {}
 	a['entities'] = entities
 	a['allocator'] = allocator
 	
@@ -52,20 +58,25 @@ def intercrop_area(size, entities=None, allocator=None):
 
 def __intercrop_area_init(area):
 	# 初始化实现
-	# 移动到左下角
-	area_move_to_corner(area, 'bottom_left')
+	# 移动到最近顶点
+	area_move_to_nearest_corner(area)
 	
 	# 使用通用 init hook（带 selector）
 	hook = farming_create_init_hook_with_selector(area['entity_selector'])
-	path = area['corner_paths'][(get_pos_y(), get_pos_x())]
-	path_move_along_with_hook(path, hook, None, True)
+	route = area['corner_paths'][(get_pos_y(), get_pos_x())]
+	route_move_along_with_hook(route, hook, None, True)
 
 def __intercrop_area_process(area):
+	start_tick = area_process_begin(area)
+	harvest_dict = area['last_process_harvest']
+	do_harvest = farming_create_do_harvest(harvest_dict)
+
 	# 处理实现：立即 harvest + plant
 	# 确保在区域内
-	area_move_to_corner(area, 'bottom_left')
+	area_move_to_nearest_corner(area)
 	
 	# 使用通用 intercrop process hook
-	hook = farming_create_intercrop_process_hook(area['entity_selector'])
-	path = area['corner_paths'][(get_pos_y(), get_pos_x())]
-	path_move_along_with_hook(path, hook, None, True)
+	hook = farming_create_intercrop_process_hook(area['entity_selector'], do_harvest)
+	route = area['corner_paths'][(get_pos_y(), get_pos_x())]
+	route_move_along_with_hook(route, hook, None, True)
+	area_process_end(area, start_tick)

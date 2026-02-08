@@ -26,7 +26,69 @@ def rect_allocator(total_h, total_w):
 	# 缓存
 	allocator['free_area_cache'] = total_h * total_w
 	
+	# 调试开关（只在分配失败时输出）
+	allocator['debug'] = False
+	allocator['debug_limit'] = 12
+	
 	return allocator
+
+def rect_allocator_enable_debug(allocator, enabled=True, limit=12):
+	# 开关调试输出（仅在 alloc 失败时打印）
+	allocator['debug'] = enabled
+	allocator['debug_limit'] = limit
+
+def __allocator_debug_alloc_fail(allocator, req_h, req_w, strategy, did_compact, tried_compact):
+	# 分配失败时的诊断输出（避免在正常路径打印）
+	if 'debug' not in allocator:
+		return
+	if not allocator['debug']:
+		return
+	
+	stats = rect_allocator_stats(allocator)
+	free_rects = allocator['free_rects']
+	allocated = allocator['allocated']
+	
+	# 统计最大空闲矩形（按面积）
+	max_free = None
+	max_area = 0
+	max_h = 0
+	max_w = 0
+	for r in free_rects:
+		rh, rw = r[2], r[3]
+		area = rh * rw
+		if max_free == None or area > max_area:
+			max_free = r
+			max_area = area
+			max_h = rh
+			max_w = rw
+	
+	quick_print('[rect_alloc_fail]',
+				'req', req_h, req_w,
+				'strategy', strategy,
+				'did_compact', did_compact,
+				'tried_compact', tried_compact,
+				'free_rects', len(free_rects),
+				'allocated', len(allocated),
+				'max_free_hw', max_h, max_w,
+				'max_free', max_free,
+				'stats', stats)
+	
+	# 打印前 N 个空闲块（帮助判断碎片化）
+	limit = allocator['debug_limit']
+	i = 0
+	for r in free_rects:
+		if i >= limit:
+			break
+		quick_print('[free]', i, r)
+		i += 1
+	
+	# 打印前 N 个已分配块（帮助判断是什么占用了大块空间）
+	i = 0
+	for rid in allocated:
+		if i >= limit:
+			break
+		quick_print('[alloc]', i, rid, allocated[rid])
+		i += 1
 
 def __allocator_get_rect_y(rect):
 	# 获取矩形的y坐标
@@ -86,7 +148,7 @@ def rect_allocator_stats(allocator):
 	
 	return stats
 
-def rect_allocator_alloc(allocator, h, w, strategy='best_area_fit'):
+def rect_allocator_alloc(allocator, h, w, strategy='best_area_fit', _did_compact=False):
 	# 分配指定大小的矩形
 	free_rects = allocator['free_rects']
 	free_count = len(free_rects)
@@ -137,9 +199,13 @@ def rect_allocator_alloc(allocator, h, w, strategy='best_area_fit'):
 	
 	if best_rect == None:
 		# 尝试整理空间
-		if rect_allocator_compact(allocator):
+		compacted = rect_allocator_compact(allocator)
+		if compacted:
 			# 整理后重试
-			return rect_allocator_alloc(allocator, h, w, strategy)
+			return rect_allocator_alloc(allocator, h, w, strategy, True)
+		
+		# compact 后仍失败（或 compact 无法移动），输出诊断
+		__allocator_debug_alloc_fail(allocator, h, w, strategy, _did_compact, True)
 		return None
 	
 	# 2. 从空闲列表中移除选中的矩形

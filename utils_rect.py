@@ -2,6 +2,8 @@
 # 矩形基础属性和计算函数
 # 性能敏感：避免不必要检查，直接解包操作
 
+from utils_point import point_subtract, vector_len
+
 def rectangle(y, x, h, w):
 	# 创建一个矩形，返回 (y, x, h, w)
 	return (y, x, h, w)
@@ -59,7 +61,7 @@ def rectangle_contains_point(rect, point):
 	# 判断点是否在矩形内
 	y, x, h, w = rect
 	py, px = point
-	return y <= py < y + h and x <= px < x + w
+	return y <= py and py < y + h and x <= px and px < x + w
 
 def rectangle_contains_rect(rect, other):
 	# 判断矩形是否完全包含另一个矩形
@@ -69,3 +71,22 @@ def rectangle_contains_rect(rect, other):
 			x1 <= x2 and 
 			y1 + h1 >= y2 + h2 and 
 			x1 + w1 >= x2 + w2)
+
+def rectangle_center(rect):
+	# 获取矩形中心坐标
+	y, x, h, w = rect
+	return (y + h // 2, x + w // 2)
+
+def rectangle_nearest_vertex(rect, target):
+	# 找到矩形中距离目标点最近的顶点
+	vertices = rectangle_get_vertices(rect)
+	nearest = vertices[0]
+	min_dist = vector_len(point_subtract(nearest, target))
+	
+	for v in vertices:
+		dist = vector_len(point_subtract(v, target))
+		if dist < min_dist:
+			min_dist = dist
+			nearest = v
+	
+	return nearest

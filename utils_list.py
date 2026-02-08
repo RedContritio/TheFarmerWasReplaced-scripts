@@ -186,3 +186,21 @@ def list_insert_sorted(lst, item, less_func):
 		lst[pos] = item
 	
 	return pos
+
+def list_foreach(lst, func):
+	# 对列表每个元素应用函数，返回新列表
+	result = []
+	for item in lst:
+		result.append(func(item))
+	return result
+
+
+def list_random_choice(lst):
+	# 从非空列表中随机选择一个元素
+	# 返回：元素；若列表为空返回 None
+	n = len(lst)
+	if n <= 0:
+		return None
+	# random() in [0, 1)，取 floor(random*n)
+	i = (random() * n) // 1
+	return lst[i]
