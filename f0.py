@@ -34,6 +34,14 @@ maze = maze_area(MAZE_SIZE, MAZE_TIMES)
 # 分配其它区域（intercrop 已不再使用）
 areas = []
 
+cactus = cactus_area(CACTUS_SIZE)
+if cactus != None:
+	areas.append(cactus)
+
+comp_carrot = companion_area((10, 10), Entities.Carrot)
+if comp_carrot != None:
+	areas.append(comp_carrot)
+
 pumpkin = pumpkin_area(PUMPKIN_SIZE)
 if pumpkin != None:
 	areas.append(pumpkin)
@@ -42,14 +50,18 @@ sunflower = sunflower_area(SUNFLOWER_SIZE)
 if sunflower != None:
 	areas.append(sunflower)
 
-cactus = cactus_area(CACTUS_SIZE)
-if cactus != None:
-	areas.append(cactus)
-
 # 只需要 grass / carrot / tree 三种 companion 区
 comp_grass = companion_area(COMPANION_SIZE, Entities.Grass)
 if comp_grass != None:
 	areas.append(comp_grass)
+
+comp_grass = companion_area(COMPANION_SIZE, Entities.Grass)
+if comp_grass != None:
+	areas.append(comp_grass)
+
+comp_carrot = companion_area(COMPANION_SIZE, Entities.Carrot)
+if comp_carrot != None:
+	areas.append(comp_carrot)
 
 comp_carrot = companion_area(COMPANION_SIZE, Entities.Carrot)
 if comp_carrot != None:

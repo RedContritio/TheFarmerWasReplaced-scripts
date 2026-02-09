@@ -1,4 +1,5 @@
 from utils_direction import (
+	direction_to_vector2d,
 	vector_to_direction,
 	vector1d_y_to_direction,
 	vector1d_x_to_direction,
@@ -12,7 +13,7 @@ from utils_rect import (
 	rectangle_center,
 	rectangle_nearest_vertex
 )
-from utils_point import point_subtract
+from utils_point import point_subtract, point_add
 
 
 # 螺旋方向向量：(outward/inward, clockwise/counterclockwise) -> [(dy, dx), ...]
@@ -339,3 +340,206 @@ def rect_get_hamiltonian_path(rect, start_point, mode="snake_x"):
 	else:
 		route_start = handler(rect, path, start_point, mode)
 	return (path, route_start)
+
+
+def __rect_get_hamiltonian_cycle_even_w(rect):
+	# 在 h x w 矩形格点图上构造哈密顿回路（w 为偶数，且 h,w >= 2）
+	# 返回：cycle_points（按回路顺序的点列表，元素为 (y, x)）
+	#
+	# 回路存在条件：h>=2,w>=2，且至少一边为偶数（本函数处理 w 为偶数的情况）
+	y0, x0, h, w = rect
+	cycle = []
+	cycle.append((y0, x0))
+
+	# 第一列向上走满
+	dy = 1
+	while dy < h:
+		cycle.append((y0 + dy, x0))
+		dy += 1
+
+	# 剩余列蛇形走满，但跳过顶行 y0（顶行最后用来闭环）
+	dx = 1
+	while dx < w:
+		if (dx % 2) == 1:
+			# 奇数列：从底部进入，向上扫到 y0+1
+			cycle.append((y0 + h - 1, x0 + dx))
+			dy2 = h - 2
+			while dy2 > 0:
+				cycle.append((y0 + dy2, x0 + dx))
+				dy2 -= 1
+		else:
+			# 偶数列：从 y0+1 进入，向下扫到底部
+			cycle.append((y0 + 1, x0 + dx))
+			dy2 = 2
+			while dy2 < h:
+				cycle.append((y0 + dy2, x0 + dx))
+				dy2 += 1
+		dx += 1
+
+	# 顶行从右往左走到 x0+1（最后一个点与起点 (y0,x0) 相邻，完成闭环）
+	cycle.append((y0, x0 + w - 1))
+	dx = w - 2
+	while dx > 0:
+		cycle.append((y0, x0 + dx))
+		dx -= 1
+
+	return cycle
+
+
+def rect_get_hamiltonian_cycle(rect):
+	# 生成矩形格点图的哈密顿回路（Hamiltonian cycle）
+	# rect: (y0, x0, h, w)
+	# 返回：cycle_points 或 None（当 h,w 都为奇数或维度退化时）
+	y0, x0, h, w = rect
+	if h < 2 or w < 2:
+		return None
+
+	# 哈密顿回路存在条件：至少一边为偶数
+	if (w % 2) == 0:
+		return __rect_get_hamiltonian_cycle_even_w(rect)
+
+	if (h % 2) == 0:
+		# 转置：在 (x0,y0,w,h) 上生成，再映射回 (y,x)
+		t_cycle = __rect_get_hamiltonian_cycle_even_w((x0, y0, w, h))
+		if t_cycle == None:
+			return None
+		cycle = []
+		for p in t_cycle:
+			py, px = p
+			cycle.append((px, py))
+		return cycle
+
+	return None
+
+
+def rect_get_hamiltonian_cycle_index(rect):
+	# 返回 (cycle_points, index_map, L) 或 (None, None, 0)
+	cycle = rect_get_hamiltonian_cycle(rect)
+	if cycle == None:
+		return None, None, 0
+
+	index_map = {}
+	i = 0
+	for p in cycle:
+		index_map[p] = i
+		i += 1
+
+	return cycle, index_map, i
+
+
+def route_walk_to_point(target_point, blocked_set=None, except_in_blocked=None):
+	# 从当前位置沿曼哈顿路径走向 target_point（先 y 后 x），遇阻即停。
+	# blocked_set：不可踏入的格子集合；except_in_blocked：即使在其中也允许踏入的格子（如尾尖）。
+	# 返回 (final_point, path_points)：最终坐标、以及途经点列表 [起点, ..., 终点]（含起点与终点）。
+	current = (get_pos_y(), get_pos_x())
+	path_points = [current]
+	path = vector_get_path(point_subtract(target_point, current))
+	idx = 0
+	while idx < len(path):
+		d = path[idx]
+		step = direction_to_vector2d(d)
+		np = point_add(current, step)
+		if blocked_set != None:
+			if np in blocked_set:
+				if except_in_blocked == None or np not in except_in_blocked:
+					return (current, path_points)
+		ok = move(d)
+		if not ok:
+			return (current, path_points)
+		current = (get_pos_y(), get_pos_x())
+		path_points.append(current)
+		idx += 1
+	return (current, path_points)
+
+
+def route_bfs_path(start, target, get_neighbors):
+	# BFS 寻路：从 start 到 target，get_neighbors(node) 返回从 node 可走的下一格列表。
+	# 返回 [start, ..., target] 或 None（不可达）。
+	if start == target:
+		return [start]
+	visited = {}
+	parent = {}
+	queue = [start]
+	visited[start] = True
+	while len(queue) > 0:
+		curr = queue.pop(0)
+		if curr == target:
+			path_back = []
+			p = target
+			while True:
+				path_back.append(p)
+				if p == start:
+					break
+				p = parent[p]
+			path = []
+			i = len(path_back) - 1
+			while i >= 0:
+				path.append(path_back[i])
+				i -= 1
+			return path
+		neighbors = get_neighbors(curr)
+		ni = 0
+		while ni < len(neighbors):
+			n = neighbors[ni]
+			if n not in visited:
+				visited[n] = True
+				parent[n] = curr
+				queue.append(n)
+			ni += 1
+	return None
+
+
+def route_astar_path(start, target, get_neighbors, heuristic):
+	# A* 寻路：f = g + heuristic(node)。优先扩展 f 最小的节点，使搜索尽量朝目标方向走。
+	# heuristic(node) 应返回从 node 到 target 的估计代价（如曼哈顿距离）。
+	# 返回 [start, ..., target] 或 None。
+	if start == target:
+		return [start]
+	parent = {}
+	g = {}
+	g[start] = 0
+	h0 = heuristic(start)
+	open_list = [(h0, 0, start)]
+	while len(open_list) > 0:
+		best_i = 0
+		i = 1
+		while i < len(open_list):
+			if open_list[i][0] < open_list[best_i][0]:
+				best_i = i
+			i += 1
+		f_curr, g_curr, curr = open_list[best_i]
+		open_list.pop(best_i)
+		if g[curr] < g_curr:
+			continue
+		if curr == target:
+			path_back = []
+			p = target
+			while True:
+				path_back.append(p)
+				if p == start:
+					break
+				p = parent[p]
+			path = []
+			pi = len(path_back) - 1
+			while pi >= 0:
+				path.append(path_back[pi])
+				pi -= 1
+			return path
+		neighbors = get_neighbors(curr)
+		ni = 0
+		while ni < len(neighbors):
+			n = neighbors[ni]
+			g_new = g_curr + 1
+			if n not in g:
+				g[n] = g_new
+				parent[n] = curr
+				h_n = heuristic(n)
+				open_list.append((g_new + h_n, g_new, n))
+			else:
+				if g_new < g[n]:
+					g[n] = g_new
+					parent[n] = curr
+					h_n = heuristic(n)
+					open_list.append((g_new + h_n, g_new, n))
+			ni += 1
+	return None

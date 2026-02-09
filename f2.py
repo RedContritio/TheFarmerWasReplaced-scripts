@@ -11,6 +11,6 @@ def f(p, ha):
 	till()
 
 rect = (cy, cx, 10, 10)
-route = rect_get_hamiltonian_path(rect, (cy, cx), "spiral_inward_cw")
+route = rect_get_hamiltonian_path(rect, (cy, cx), "spiral_outward_ccw")
 
 route_move_along_with_hook(route, f)
