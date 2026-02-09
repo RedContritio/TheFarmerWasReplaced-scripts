@@ -6,6 +6,33 @@ from utils_route import rect_get_hamiltonian_path, vector_get_path
 from utils_move import route_move_along_with_hook, route_move_along, path_move_along
 from utils_point import point_subtract
 from utils_list import list_sort_by_yx
+from utils_rect_allocator import rect_allocator_instance_get, rect_allocator_alloc
+
+def __area_init(area_type, size, allocator=None):
+	# Common initialization logic for all area types
+	# Returns: (area_dict, rect_id, rect) or (None, None, None) if allocation fails
+	
+	if allocator == None:
+		allocator = rect_allocator_instance_get()
+	
+	# Parse size
+	h, w = size
+	
+	# Allocate space
+	alloc = rect_allocator_alloc(allocator, h, w)
+	if alloc == None:
+		print(area_type + "_area: alloc failed", h, w)
+		return None, None, None
+	rect_id, rect = alloc
+	
+	# Create area object
+	a = area(rect_id, rect)
+	a['area_type'] = area_type
+	a['last_process_tick'] = 0
+	a['last_process_harvest'] = {}
+	a['allocator'] = allocator
+	
+	return a, rect_id, rect
 
 def area(rect_id, rect):
 	# 创建通用区域对象

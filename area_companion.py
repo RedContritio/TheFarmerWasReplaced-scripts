@@ -2,7 +2,7 @@
 # 同伴区（多种作物混种，带同伴增益）
 
 from utils_area import (
-	area,
+	__area_init,
 	area_move_to_nearest_corner,
 	area_move_to_point,
 	area_visit_points,
@@ -17,15 +17,11 @@ from utils_farming import (
 from utils_move import route_move_along_with_hook
 from utils_rect import rectangle_contains_point
 from utils_route import rect_get_hamiltonian_path
-from utils_rect_allocator import rect_allocator_instance_get
-from utils_rect_allocator import rect_allocator_alloc
 from utils_list import list_random_choice
 
 def companion_area(size, entity, allocator=None):
 	# 创建同伴区
 	# size: (h, w)
-	if allocator == None:
-		allocator = rect_allocator_instance_get()
 
 	# companion 只支持这四种实体；否则随机选择一种并提示
 	allowed = [Entities.Grass, Entities.Bush, Entities.Tree, Entities.Carrot]
@@ -35,24 +31,14 @@ def companion_area(size, entity, allocator=None):
 		target_entity = list_random_choice(allowed)
 		print("companion_area: invalid target_entity", old, "->", target_entity)
 	
-	# 解析尺寸
-	h, w = size
-	
-	# 分配空间
-	alloc = rect_allocator_alloc(allocator, h, w)
-	if alloc == None:
-		print("companion_area: alloc failed", h, w)
+	# 使用公共初始化逻辑
+	a, rect_id, rect = __area_init('companion', size, allocator)
+	if a == None:
 		return None
-	rect_id, rect = alloc
 	
-	# 创建区域对象
-	a = area(rect_id, rect)
-	a['area_type'] = 'companion'
-	a['last_process_tick'] = 0
-	a['last_process_harvest'] = {}
-	# 目标作物（同伴区的“主作物”）
+	# 设置同伴区特有属性
+	# 目标作物（同伴区的"主作物"）
 	a['target_entity'] = target_entity
-	a['allocator'] = allocator
 	
 	# 设置处理器
 	a['area_init'] = __companion_area_init
@@ -66,7 +52,6 @@ def companion_area(size, entity, allocator=None):
 	a['entity_selector'] = entity_selector
 	
 	return a
-
 
 def __companion_area_init(area):
 	# 初始化：确保全区域都是 target_entity（主作物）

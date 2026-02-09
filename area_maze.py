@@ -2,7 +2,7 @@
 # 迷宫区域
 
 from utils_area import (
-	area,
+	__area_init,
 	area_init_attr,
 	area_get_attr,
 	area_set_attr,
@@ -22,34 +22,21 @@ from utils_point import point_subtract
 from utils_route import vector_get_path
 from utils_move import path_move_along
 from utils_direction import direction_negate
-from utils_rect_allocator import rect_allocator_instance_get
-from utils_rect_allocator import rect_allocator_alloc
 from utils_farming import farming_create_do_harvest
 
 def maze_area(size, times, allocator=None):
 	# 创建迷宫区域
 	# size: (h, w) - 迷宫必须是正方形
-	if allocator == None:
-		allocator = rect_allocator_instance_get()
 	
 	# 解析尺寸（迷宫必须是正方形，取较小值）
 	h, w = size
 	h = min(h, w)
 	w = h
 	
-	# 分配空间
-	alloc = rect_allocator_alloc(allocator, h, w)
-	if alloc == None:
-		print("maze_area: alloc failed", h, w)
+	# 使用公共初始化逻辑
+	a, rect_id, rect = __area_init('maze', (h, w), allocator)
+	if a == None:
 		return None
-	rect_id, rect = alloc
-	
-	# 创建区域对象
-	a = area(rect_id, rect)
-	a['area_type'] = 'maze'
-	a['last_process_tick'] = 0
-	a['last_process_harvest'] = {}
-	a['allocator'] = allocator
 	
 	y, x, h, w = rect
 	

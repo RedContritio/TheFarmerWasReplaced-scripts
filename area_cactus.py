@@ -2,7 +2,7 @@
 # 仙人掌种植区域
 
 from utils_area import (
-	area,
+	__area_init,
 	area_init_attr,
 	area_get_attr,
 	area_set_attr,
@@ -22,28 +22,18 @@ from utils_farming import (
 from utils_move import route_move_along_with_hook
 from utils_math import sign
 from utils_direction import vector1d_y_to_direction, vector1d_x_to_direction
-from utils_rect_allocator import rect_allocator_instance_get
-from utils_rect_allocator import rect_allocator_alloc
 
 def cactus_area(size, allocator=None):
 	# 创建仙人掌区域
 	# size: (h, w)
-	if allocator == None:
-		allocator = rect_allocator_instance_get()
 	
-	# 解析尺寸
-	h, w = size
+	# 使用公共初始化逻辑
+	a, rect_id, rect = __area_init('cactus', size, allocator)
+	if a == None:
+		return None
 	
-	# 分配空间
-	rect_id, rect = rect_allocator_alloc(allocator, h, w)
-	
-	# 创建区域对象
-	a = area(rect_id, rect)
-	a['area_type'] = 'cactus'
-	a['last_process_tick'] = 0
-	a['last_process_harvest'] = {}
+	# 设置仙人掌特有属性
 	a['entity_type'] = Entities.Cactus
-	a['allocator'] = allocator
 	
 	# 设置处理器
 	a['area_init'] = __cactus_area_init

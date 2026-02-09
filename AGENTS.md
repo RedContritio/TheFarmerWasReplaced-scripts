@@ -8,6 +8,21 @@ description:
 alwaysApply: true
 ---
 
+## Code Organization Strategy
+
+### Syntax Usage Policy
+- **Top-level code (f0, etc.)**: Can use game-specific syntax sugar for convenience
+- **Internal tools/libraries**: Use Python and game syntax common subset only
+  - Ensures testability with pytest
+  - Maintains compatibility with standard Python
+  - Avoids game-specific features like object method syntax sugar
+
+### Rationale
+This layered approach allows:
+- Enjoying syntax sugar convenience in game code
+- Testing core logic with pytest using standard Python
+- Clear separation between game-specific and portable code
+
 ## 语言特性总结
 
 ### 基本数据结构

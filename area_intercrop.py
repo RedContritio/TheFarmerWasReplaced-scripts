@@ -2,7 +2,7 @@
 # 杂种区（多种作物混种）
 
 from utils_area import (
-	area,
+	__area_init,
 	area_init_attr,
 	area_move_to_nearest_corner,
 	area_process_begin,
@@ -14,33 +14,23 @@ from utils_farming import (
 	farming_create_do_harvest
 )
 from utils_move import route_move_along_with_hook
-from utils_rect_allocator import rect_allocator_instance_get
-from utils_rect_allocator import rect_allocator_alloc
 
 DEFAULT_INTERCROP_ENTITIES = [Entities.Grass, Entities.Tree, Entities.Carrot]
 
 def intercrop_area(size, entities=None, allocator=None):
 	# 创建杂种区
 	# size: (h, w)
-	if allocator == None:
-		allocator = rect_allocator_instance_get()
 	
 	if entities == None:
 		entities = DEFAULT_INTERCROP_ENTITIES
 	
-	# 解析尺寸
-	h, w = size
+	# 使用公共初始化逻辑
+	a, rect_id, rect = __area_init('intercrop', size, allocator)
+	if a == None:
+		return None
 	
-	# 分配空间
-	rect_id, rect = rect_allocator_alloc(allocator, h, w)
-	
-	# 创建区域对象
-	a = area(rect_id, rect)
-	a['area_type'] = 'intercrop'
-	a['last_process_tick'] = 0
-	a['last_process_harvest'] = {}
+	# 设置杂种区特有属性
 	a['entities'] = entities
-	a['allocator'] = allocator
 	
 	# 设置处理器
 	a['area_init'] = __intercrop_area_init
