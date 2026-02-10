@@ -1,6 +1,6 @@
 import random as py_random
 import builtins as python_builtins
-from number_wrapper import Number
+from .number_wrapper import Number
 
 # Save original Python builtins before we override them
 _original_len = python_builtins.len
@@ -165,6 +165,14 @@ def add(c, item):
     """Game version of add() - adds item to set"""
     c.add(item)
 
+def append(c, item):
+    """Game version of append() - appends item to list"""
+    c.append(item)
+
+def pop(c, index=-1):
+    """Game version of pop() - removes and returns item at index"""
+    return c.pop(index)
+
 def remove(c, item):
     """Game version of remove() - removes item from collection"""
     if hasattr(c, 'remove'):
@@ -223,6 +231,8 @@ def setup_game_builtins():
     # Override Python builtins with game versions (only functions, not types)
     python_builtins.len = len
     python_builtins.add = add
+    python_builtins.append = append
+    python_builtins.pop = pop
     python_builtins.remove = remove
     python_builtins.print = print
     python_builtins.quick_print = quick_print

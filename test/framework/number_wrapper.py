@@ -5,6 +5,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils_math import sign as _sign, clamp as _clamp
+from .tick_system import _add_ticks
 
 
 class Number(float):
@@ -25,7 +26,9 @@ class Number(float):
         return Number(_clamp(self, min_value, max_value))
     
     # Ensure arithmetic operations return Number instances
+    # Note: tick counting is handled by AST transformer, not here
     def __add__(self, other):
+        print(f"[DEBUG Number.__add__] self={self}, other={other}, type(other)={type(other)}")
         return Number(float.__add__(self, other))
     
     def __radd__(self, other):
@@ -77,7 +80,8 @@ class Number(float):
         return Number(float.__abs__(self))
 
     def __index__(self):
-        return int(self)
+        """Convert to int for use as list/tuple index"""
+        return int(float(self))
 
 
 def wrap_number(value):

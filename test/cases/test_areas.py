@@ -1,10 +1,4 @@
 import pytest
-from area_pumpkin import pumpkin_area
-from area_sunflower import sunflower_area
-from area_cactus import cactus_area
-from area_companion import companion_area
-from area_maze import maze_area
-from utils_rect import rectangle
 
 
 class TestPumpkinArea:
@@ -12,6 +6,7 @@ class TestPumpkinArea:
     
     def test_pumpkin_area_creation(self):
         """测试南瓜区域创建"""
+        from area_pumpkin import pumpkin_area
         size = (6, 6)
         area = pumpkin_area(size)
         
@@ -24,6 +19,7 @@ class TestPumpkinArea:
         
     def test_pumpkin_area_invalid_size(self):
         """测试无效尺寸的南瓜区域创建"""
+        from area_pumpkin import pumpkin_area
         # 过小的尺寸 - 实际上会创建成功，只是很小
         area = pumpkin_area((1, 1))
         assert area is not None
@@ -38,6 +34,7 @@ class TestSunflowerArea:
     
     def test_sunflower_area_creation(self):
         """测试向日葵区域创建"""
+        from area_sunflower import sunflower_area
         size = (10, 10)
         area = sunflower_area(size)
         
@@ -50,6 +47,7 @@ class TestSunflowerArea:
         
     def test_sunflower_area_unique(self):
         """测试向日葵区域的唯一性（全场只保留一块）"""
+        from area_sunflower import sunflower_area
         size = (10, 10)
         area1 = sunflower_area(size)
         area2 = sunflower_area(size)
@@ -65,6 +63,7 @@ class TestCactusArea:
     
     def test_cactus_area_creation(self):
         """测试仙人掌区域创建"""
+        from area_cactus import cactus_area
         size = (12, 12)
         area = cactus_area(size)
         
@@ -77,6 +76,7 @@ class TestCactusArea:
         
     def test_cactus_area_larger_size(self):
         """测试仙人掌区域可以接受更大的尺寸"""
+        from area_cactus import cactus_area
         size = (15, 15)
         area = cactus_area(size)
         
@@ -89,6 +89,8 @@ class TestCompanionArea:
     
     def test_companion_area_grass(self):
         """测试草伴生区域创建"""
+        from area_companion import companion_area
+        from framework.game_builtins import Entities
         size = (6, 6)
         area = companion_area(size, Entities.Grass)
         
@@ -97,6 +99,8 @@ class TestCompanionArea:
         
     def test_companion_area_carrot(self):
         """测试胡萝卜伴生区域创建"""
+        from area_companion import companion_area
+        from framework.game_builtins import Entities
         size = (6, 6)
         area = companion_area(size, Entities.Carrot)
         
@@ -105,6 +109,8 @@ class TestCompanionArea:
         
     def test_companion_area_tree(self):
         """测试树伴生区域创建"""
+        from area_companion import companion_area
+        from framework.game_builtins import Entities
         size = (6, 6)
         area = companion_area(size, Entities.Tree)
         
@@ -113,6 +119,7 @@ class TestCompanionArea:
         
     def test_companion_area_invalid_type(self):
         """测试无效类型的伴生区域创建"""
+        from area_companion import companion_area
         size = (6, 6)
         area = companion_area(size, 9999)  # 使用一个无效的枚举值
         
@@ -125,6 +132,7 @@ class TestMazeArea:
     
     def test_maze_area_creation(self):
         """测试迷宫区域创建"""
+        from area_maze import maze_area
         size = (16, 16)
         times = 300
         area = maze_area(size, times)
@@ -138,6 +146,7 @@ class TestMazeArea:
         
     def test_maze_area_generation(self):
         """测试迷宫生成"""
+        from area_maze import maze_area
         size = (16, 16)
         times = 100  # 减少迭代次数用于测试
         area = maze_area(size, times)

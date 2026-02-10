@@ -2,7 +2,6 @@
 Singleton tick system for game time tracking
 """
 import inspect
-import os
 import threading
 
 class TickSystem:
@@ -12,6 +11,41 @@ class TickSystem:
     
     # 线程局部变量，用于防止在检查调用栈时触发 tick 计数
     _checking_stack = threading.local()
+    
+    # 模块白名单：只有这些模块的调用才会计数 tick
+    # 包含 Save0 根目录下的所有项目代码模块
+    _module_whitelist = {
+        # 主程序
+        'main',
+        # 临时验证文件
+        'f0', 'f1', 'f2', 'f3', 'f4',
+        # 区域模块
+        'area_cactus',
+        'area_companion',
+        'area_dinosaur',
+        'area_intercrop',
+        'area_maze',
+        'area_pumpkin',
+        'area_sunflower',
+        # 工具模块
+        'utils_area',
+        'utils_dict',
+        'utils_direction',
+        'utils_drone',
+        'utils_farming',
+        'utils_list',
+        'utils_math',
+        'utils_maze',
+        'utils_move',
+        'utils_point',
+        'utils_pytest',
+        'utils_rect',
+        'utils_rect_allocator',
+        'utils_rect_ex',
+        'utils_route',
+        'utils_singleton',
+        'utils_user',
+    }
     
     def __new__(cls):
         if cls._instance is None:
@@ -28,7 +62,7 @@ class TickSystem:
     @classmethod
     def _should_count_tick(cls):
         """检查调用栈，判断是否应该计数 tick
-        只有当调用来自 Save0 根目录的项目代码时才返回 True
+        只有当调用来自白名单模块时才返回 True
         """
         # 防止在检查调用栈时触发 tick 计数（避免无限递归）
         if getattr(cls._checking_stack, 'active', False):
@@ -41,27 +75,12 @@ class TickSystem:
         
             # 从栈顶往下找（跳过当前函数和 add_ticks）
             for frame_info in stack[2:]:  # 跳过 _should_count_tick 和 add_ticks
-                filename = frame_info.filename
+                # 获取模块名（从 frame 的 globals 中获取 __name__）
+                module_name = frame_info.frame.f_globals.get('__name__', '')
                 
-                # 检查是否是 Save0 根目录下的文件
-                if 'Save0' in filename:
-                    # 排除 test/ 目录
-                    if '/test/' in filename or '\\test\\' in filename:
-                        continue
-                    
-                    # 排除 tick_system.py 本身
-                    if 'tick_system.py' in filename:
-                        continue
-                    
-                    # 检查是否直接在 Save0 根目录下（不在子目录中）
-                    save0_index = filename.find('Save0')
-                    if save0_index != -1:
-                        # 获取 Save0 之后的路径部分
-                        after_save0 = filename[save0_index + 6:]  # 6 = len('Save0/')
-                        # 如果路径中没有更多的目录分隔符（除了文件名本身），说明在根目录
-                        path_parts = after_save0.split(os.sep)
-                        if len(path_parts) == 1:  # 只有文件名，没有子目录
-                            return True
+                # 检查是否在白名单中
+                if module_name in cls._module_whitelist:
+                    return True
             
             return False
         finally:

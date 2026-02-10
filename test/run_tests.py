@@ -18,11 +18,12 @@ sys.path.insert(0, str(parent_dir))
 # These constants are available globally in the game but need to be defined for Python tests
 # Install number wrapper for automatic Number class wrapping
 # Transform area_, utils_, and test_ modules
-from number_ast_transformer import install_number_wrapper
-install_number_wrapper(target_modules=['area_', 'utils_', 'test_'])
+# This also handles tick injection for pass statements and logical operators
+from framework.number_ast_transformer import install_number_wrapper
+install_number_wrapper(target_modules=['area_', 'utils_', 'cases.test_'])
 
 # Setup game built-in environment
-from game_builtins import setup_game_builtins, get_world_size
+from framework.game_builtins import setup_game_builtins, get_world_size
 setup_game_builtins()
 
 # Initialize rect allocator for testing
