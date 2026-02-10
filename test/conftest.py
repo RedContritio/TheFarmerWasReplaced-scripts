@@ -1,7 +1,9 @@
 """
 Pytest configuration and fixtures
 """
+
 import pytest
+
 
 @pytest.fixture(autouse=True)
 def reset_game_state():

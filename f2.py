@@ -7,8 +7,10 @@ move_to(5, 5)
 cy = get_pos_y()
 cx = get_pos_x()
 
+
 def f(p, ha):
-	till()
+    till()
+
 
 rect = (cy, cx, 10, 10)
 route = rect_get_hamiltonian_path(rect, (cy, cx), "spiral_outward_ccw")

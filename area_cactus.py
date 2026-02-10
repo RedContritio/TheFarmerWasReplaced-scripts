@@ -2,230 +2,244 @@
 # 仙人掌种植区域
 
 from utils_area import (
-	__area_init,
-	area_init_attr,
-	area_get_attr,
-	area_set_attr,
-	area_count_attr,
-	area_set_all_attr,
-	area_count_blocks,
-	area_move_to_nearest_corner,
-	area_move_to_point,
-	area_process_begin,
-	area_process_end
+    __area_init,
+    area_init_attr,
+    area_get_attr,
+    area_set_attr,
+    area_count_attr,
+    area_set_all_attr,
+    area_count_blocks,
+    area_move_to_nearest_corner,
+    area_move_to_point,
+    area_process_begin,
+    area_process_end,
 )
 from utils_farming import (
-	farming_create_init_hook,
-	farming_create_plant_hook,
-	farming_create_do_harvest
+    farming_create_init_hook,
+    farming_create_plant_hook,
+    farming_create_do_harvest,
 )
 from utils_move import route_move_along_with_hook
 from utils_math import sign
 from utils_direction import vector1d_y_to_direction, vector1d_x_to_direction
 
+
 def cactus_area(size, allocator=None):
-	# 创建仙人掌区域
-	# size: (h, w)
-	
-	# 使用公共初始化逻辑
-	a, rect_id, rect = __area_init('cactus', size, allocator)
-	if a == None:
-		return None
-	
-	# 设置仙人掌特有属性
-	a['entity_type'] = Entities.Cactus
-	
-	# 设置处理器
-	a['area_init'] = __cactus_area_init
-	a['area_processor'] = __cactus_area_process
-	
-	# 初始化属性
-	area_init_attr(a, 'harvestable', False)
-	area_init_attr(a, 'measure', None)
-	
-	# measure 分组（用于排序收获）
-	a['measure_groups'] = {}
-	a['measure_groups'][None] = set()
-	
-	y, x, h, w = rect
-	for dy in range(h):
-		for dx in range(w):
-			block = (y + dy, x + dx)
-			a['measure_groups'][None].add(block)
-	
-	return a
+    # 创建仙人掌区域
+    # size: (h, w)
+
+    # 使用公共初始化逻辑
+    a, rect_id, rect = __area_init("cactus", size, allocator)
+    if a == None:
+        return None
+
+    # 设置仙人掌特有属性
+    a["entity_type"] = Entities.Cactus
+
+    # 设置处理器
+    a["area_init"] = __cactus_area_init
+    a["area_processor"] = __cactus_area_process
+
+    # 初始化属性
+    area_init_attr(a, "harvestable", False)
+    area_init_attr(a, "measure", None)
+
+    # measure 分组（用于排序收获）
+    a["measure_groups"] = {}
+    a["measure_groups"][None] = set()
+
+    y, x, h, w = rect
+    for dy in range(h):
+        for dx in range(w):
+            block = (y + dy, x + dx)
+            a["measure_groups"][None].add(block)
+
+    return a
+
 
 def __cactus_update_measure(area, block, value):
-	# 更新 measure 并维护分组
-	old_value = area_get_attr(area, 'measure', block)
-	
-	if old_value == value:
-		return
-	
-	measure_groups = area['measure_groups']
-	measure_groups[old_value].remove(block)
-	
-	if value not in measure_groups:
-		measure_groups[value] = set()
-	measure_groups[value].add(block)
-	
-	area_set_attr(area, 'measure', block, value)
+    # 更新 measure 并维护分组
+    old_value = area_get_attr(area, "measure", block)
+
+    if old_value == value:
+        return
+
+    measure_groups = area["measure_groups"]
+    measure_groups[old_value].remove(block)
+
+    if value not in measure_groups:
+        measure_groups[value] = set()
+    measure_groups[value].add(block)
+
+    area_set_attr(area, "measure", block, value)
+
 
 def __cactus_swap_and_move(S_dict, sy, sx, dy, dx):
-	# 交换并移动到目标位置
-	step_y = sign(dy)
-	direction_y = vector1d_y_to_direction(step_y)
-	steps_y = abs(dy)
-	
-	step_x = sign(dx)
-	direction_x = vector1d_x_to_direction(step_x)
-	steps_x = abs(dx)
-	
-	for _ in range(steps_y):
-		ny = sy + step_y
-		nx = sx
-		S_dict[(sy, sx)], S_dict[(ny, nx)] = S_dict[(ny, nx)], S_dict[(sy, sx)]
-		swap(direction_y)
-		move(direction_y)
-		
-		sy = ny
-		sx = nx
-	
-	for _ in range(steps_x):
-		ny = sy
-		nx = sx + step_x
-		S_dict[(sy, sx)], S_dict[(ny, nx)] = S_dict[(ny, nx)], S_dict[(sy, sx)]
-		swap(direction_x)
-		move(direction_x)
-		
-		sy = ny
-		sx = nx
+    # 交换并移动到目标位置
+    step_y = sign(dy)
+    direction_y = vector1d_y_to_direction(step_y)
+    steps_y = abs(dy)
+
+    step_x = sign(dx)
+    direction_x = vector1d_x_to_direction(step_x)
+    steps_x = abs(dx)
+
+    for _ in range(steps_y):
+        ny = sy + step_y
+        nx = sx
+        S_dict[(sy, sx)], S_dict[(ny, nx)] = S_dict[(ny, nx)], S_dict[(sy, sx)]
+        swap(direction_y)
+        move(direction_y)
+
+        sy = ny
+        sx = nx
+
+    for _ in range(steps_x):
+        ny = sy
+        nx = sx + step_x
+        S_dict[(sy, sx)], S_dict[(ny, nx)] = S_dict[(ny, nx)], S_dict[(sy, sx)]
+        swap(direction_x)
+        move(direction_x)
+
+        sy = ny
+        sx = nx
+
 
 def __cactus_area_init(area):
-	# 初始化实现
-	entity_type = area['entity_type']
-	
-	# 移动到最近顶点
-	area_move_to_nearest_corner(area)
-	
-	# 使用通用 init hook，并在种植后立刻测量（measure 在下次种植前不变）
-	base_hook = farming_create_init_hook(entity_type)
-	def hook(point, arg):
-		base_hook(point, arg)
-		__cactus_update_measure(area, point, measure())
-	route = area['corner_paths'][(get_pos_y(), get_pos_x())]
-	route_move_along_with_hook(route, hook, None, True)
+    # 初始化实现
+    entity_type = area["entity_type"]
+
+    # 移动到最近顶点
+    area_move_to_nearest_corner(area)
+
+    # 使用通用 init hook，并在种植后立刻测量（measure 在下次种植前不变）
+    base_hook = farming_create_init_hook(entity_type)
+
+    def hook(point, arg):
+        base_hook(point, arg)
+        __cactus_update_measure(area, point, measure())
+
+    route = area["corner_paths"][(get_pos_y(), get_pos_x())]
+    route_move_along_with_hook(route, hook, None, True)
+
 
 def __cactus_area_harvest(area, do_harvest):
-	# 按 measure 排序，使用 swap 重新排列后统一收获
-	measure_groups = area['measure_groups']
-	S_dict = {}
-	
-	y, x, h, w = area['rect']
-	i = 0
-	j = 0
-	
-	# 按 measure 从大到小分配目标位置
-	for k in range(10):
-		if k not in measure_groups:
-			continue
-		
-		blocks = measure_groups[k]
-		for block in blocks:
-			target_y = y + i
-			target_x = x + j
-			S_dict[block] = (target_y, target_x)
-			
-			j += 1
-			if j == w:
-				j = 0
-				i += 1
-	
-	# 使用 swap 重新排列
-	stop_flag = False
-	while not stop_flag:
-		have_swapped = False
-		for source in S_dict:
-			sy, sx = source
-			ty, tx = S_dict[source]
-			dy = ty - sy
-			dx = tx - sx
-			
-			if dy != 0 or dx != 0:
-				# 移动到源位置
-				area_move_to_point((sy, sx))
-				
-				__cactus_swap_and_move(S_dict, sy, sx, dy, dx)
-				have_swapped = True
-		
-		if not have_swapped:
-			stop_flag = True
-	
-	# 统一收获
-	do_harvest(Entities.Cactus)
+    # 按 measure 排序，使用 swap 重新排列后统一收获
+    measure_groups = area["measure_groups"]
+    S_dict = {}
+
+    y, x, h, w = area["rect"]
+    i = 0
+    j = 0
+
+    # 按 measure 从大到小分配目标位置
+    for k in range(10):
+        if k not in measure_groups:
+            continue
+
+        blocks = measure_groups[k]
+        for block in blocks:
+            target_y = y + i
+            target_x = x + j
+            S_dict[block] = (target_y, target_x)
+
+            j += 1
+            if j == w:
+                j = 0
+                i += 1
+
+    # 使用 swap 重新排列
+    stop_flag = False
+    while not stop_flag:
+        have_swapped = False
+        for source in S_dict:
+            sy, sx = source
+            ty, tx = S_dict[source]
+            dy = ty - sy
+            dx = tx - sx
+
+            if dy != 0 or dx != 0:
+                # 移动到源位置
+                area_move_to_point((sy, sx))
+
+                __cactus_swap_and_move(S_dict, sy, sx, dy, dx)
+                have_swapped = True
+
+        if not have_swapped:
+            stop_flag = True
+
+    # 统一收获
+    do_harvest(Entities.Cactus)
+
 
 def __cactus_area_process(area):
-	start_tick = area_process_begin(area)
-	harvest_dict = area['last_process_harvest']
-	do_harvest = farming_create_do_harvest(harvest_dict)
+    start_tick = area_process_begin(area)
+    harvest_dict = area["last_process_harvest"]
+    do_harvest = farming_create_do_harvest(harvest_dict)
 
-	# 处理实现
-	entity_type = area['entity_type']
-	total_blocks = area_count_blocks(area)
+    # 处理实现
+    entity_type = area["entity_type"]
+    total_blocks = area_count_blocks(area)
 
-	# 单次 process：等待全成熟 -> 完整收获一次 -> 重播种并立刻测量 -> 返回（回到初始状态）
-	while True:
-		unknown_measure_count = area_count_attr(area, 'measure', None)
-		if unknown_measure_count > 0:
-			# 缺少测量值：补测（plant 后 measure 立即可用）
-			area_move_to_nearest_corner(area)
-			def __measure_only_hook(point, arg):
-				if area_get_attr(area, 'measure', point) == None:
-					__cactus_update_measure(area, point, measure())
-			route = area['corner_paths'][(get_pos_y(), get_pos_x())]
-			route_move_along_with_hook(route, __measure_only_hook, None, True)
+    # 单次 process：等待全成熟 -> 完整收获一次 -> 重播种并立刻测量 -> 返回（回到初始状态）
+    while True:
+        unknown_measure_count = area_count_attr(area, "measure", None)
+        if unknown_measure_count > 0:
+            # 缺少测量值：补测（plant 后 measure 立即可用）
+            area_move_to_nearest_corner(area)
 
-		harvestable_count = area_count_attr(area, 'harvestable', True)
-		if harvestable_count < total_blocks:
-			# 生长期：只标记成熟（measure 已稳定，不重复测量）
-			progress = {}
-			progress['v'] = False
-			area_move_to_nearest_corner(area)
-			def __mark_hook(point, arg):
-				if not area_get_attr(area, 'harvestable', point):
-					if can_harvest():
-						area_set_attr(area, 'harvestable', point, True)
-						progress['v'] = True
-			route = area['corner_paths'][(get_pos_y(), get_pos_x())]
-			route_move_along_with_hook(route, __mark_hook, None, True)
-			if not progress['v']:
-				pass
-			continue
+            def __measure_only_hook(point, arg):
+                if area_get_attr(area, "measure", point) == None:
+                    __cactus_update_measure(area, point, measure())
 
-		# 全部成熟：按 measure 排序 + swap 收获一次
-		__cactus_area_harvest(area, do_harvest)
+            route = area["corner_paths"][(get_pos_y(), get_pos_x())]
+            route_move_along_with_hook(route, __measure_only_hook, None, True)
 
-		# 重置 harvestable
-		area_set_all_attr(area, 'harvestable', False)
+        harvestable_count = area_count_attr(area, "harvestable", True)
+        if harvestable_count < total_blocks:
+            # 生长期：只标记成熟（measure 已稳定，不重复测量）
+            progress = {}
+            progress["v"] = False
+            area_move_to_nearest_corner(area)
 
-		# 重置 measure + 分组
-		area_set_all_attr(area, 'measure', None)
-		measure_groups = {}
-		measure_groups[None] = set()
-		area['measure_groups'] = measure_groups
-		y, x, h, w = area['rect']
-		for dy in range(h):
-			for dx in range(w):
-				measure_groups[None].add((y + dy, x + dx))
+            def __mark_hook(point, arg):
+                if not area_get_attr(area, "harvestable", point):
+                    if can_harvest():
+                        area_set_attr(area, "harvestable", point, True)
+                        progress["v"] = True
 
-		# 重新种植并立刻测量
-		area_move_to_nearest_corner(area)
-		base_hook = farming_create_plant_hook(entity_type)
-		def __replant_and_measure(point, arg):
-			base_hook(point, arg)
-			__cactus_update_measure(area, point, measure())
-		route = area['corner_paths'][(get_pos_y(), get_pos_x())]
-		route_move_along_with_hook(route, __replant_and_measure, None, True)
-		break
+            route = area["corner_paths"][(get_pos_y(), get_pos_x())]
+            route_move_along_with_hook(route, __mark_hook, None, True)
+            if not progress["v"]:
+                pass
+            continue
 
-	area_process_end(area, start_tick)
+        # 全部成熟：按 measure 排序 + swap 收获一次
+        __cactus_area_harvest(area, do_harvest)
+
+        # 重置 harvestable
+        area_set_all_attr(area, "harvestable", False)
+
+        # 重置 measure + 分组
+        area_set_all_attr(area, "measure", None)
+        measure_groups = {}
+        measure_groups[None] = set()
+        area["measure_groups"] = measure_groups
+        y, x, h, w = area["rect"]
+        for dy in range(h):
+            for dx in range(w):
+                measure_groups[None].add((y + dy, x + dx))
+
+        # 重新种植并立刻测量
+        area_move_to_nearest_corner(area)
+        base_hook = farming_create_plant_hook(entity_type)
+
+        def __replant_and_measure(point, arg):
+            base_hook(point, arg)
+            __cactus_update_measure(area, point, measure())
+
+        route = area["corner_paths"][(get_pos_y(), get_pos_x())]
+        route_move_along_with_hook(route, __replant_and_measure, None, True)
+        break
+
+    area_process_end(area, start_tick)

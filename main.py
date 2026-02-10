@@ -1,4 +1,8 @@
-from utils_rect_allocator import rect_allocator_instance_initialize, rect_allocator_instance_get, rect_allocator_enable_debug
+from utils_rect_allocator import (
+    rect_allocator_instance_initialize,
+    rect_allocator_instance_get,
+    rect_allocator_enable_debug,
+)
 from utils_drone import spawn_area_drone, spawn_maze_drone, area_step, run_maze_inline
 from area_pumpkin import pumpkin_area
 from area_sunflower import sunflower_area
@@ -40,77 +44,77 @@ areas = []
 
 pumpkin = pumpkin_area(PUMPKIN_SIZE)
 if pumpkin != None:
-	areas.append(pumpkin)
+    areas.append(pumpkin)
 
 sunflower = sunflower_area(SUNFLOWER_SIZE)
 if sunflower != None:
-	areas.append(sunflower)
+    areas.append(sunflower)
 
 cactus = cactus_area(CACTUS_SIZE)
 if cactus != None:
-	areas.append(cactus)
+    areas.append(cactus)
 
 # 仅保留 grass / carrot / tree 三种 companion 区
 comp_grass = companion_area(COMPANION_SIZE, Entities.Grass)
 if comp_grass != None:
-	areas.append(comp_grass)
+    areas.append(comp_grass)
 
 comp_carrot = companion_area(COMPANION_SIZE, Entities.Carrot)
 if comp_carrot != None:
-	areas.append(comp_carrot)
+    areas.append(comp_carrot)
 
 comp_tree = companion_area(COMPANION_SIZE, Entities.Tree)
 if comp_tree != None:
-	areas.append(comp_tree)
+    areas.append(comp_tree)
 
 # 先给普通区域生成无人机（能生成就交给无人机；失败则主线程兜底做）
 fallback_areas = []
 fallback_count = 0
 for a in areas:
-	drone = spawn_area_drone(a)
-	if drone == None:
-		fallback_areas.append(a)
-		fallback_count += 1
+    drone = spawn_area_drone(a)
+    if drone == None:
+        fallback_areas.append(a)
+        fallback_count += 1
 
 # 最后生成 maze 无人机（生成点保持在 maze 矩形外）
 maze_drone = None
 if maze != None:
-	maze_drone = spawn_maze_drone(maze)
-	if maze_drone == None:
-		# 没有无人机能力：主线程直接跑完一次 maze
-		run_maze_inline(maze)
-		# 约定：迷宫完成后再生成一个迷宫（同样不做错误检查）
-		maze = maze_area(MAZE_SIZE, MAZE_TIMES)
-		if maze != None:
-			maze_drone = spawn_maze_drone(maze)
-			if maze_drone == None:
-				run_maze_inline(maze)
-				maze = None
+    maze_drone = spawn_maze_drone(maze)
+    if maze_drone == None:
+        # 没有无人机能力：主线程直接跑完一次 maze
+        run_maze_inline(maze)
+        # 约定：迷宫完成后再生成一个迷宫（同样不做错误检查）
+        maze = maze_area(MAZE_SIZE, MAZE_TIMES)
+        if maze != None:
+            maze_drone = spawn_maze_drone(maze)
+            if maze_drone == None:
+                run_maze_inline(maze)
+                maze = None
 
 # 主线程：
 # - 兜底执行所有 spawn 失败的区域（轮询）
 # - 检测 maze_drone 完成后，自动再开下一局 maze
 fallback_i = 0
 while True:
-	# 兜底区域轮询执行（每个循环只处理一个区域，避免单区域占满）
-	if fallback_count > 0:
-		if fallback_i >= fallback_count:
-			fallback_i = 0
-		area_step(fallback_areas[fallback_i], False)
-		fallback_i += 1
+    # 兜底区域轮询执行（每个循环只处理一个区域，避免单区域占满）
+    if fallback_count > 0:
+        if fallback_i >= fallback_count:
+            fallback_i = 0
+        area_step(fallback_areas[fallback_i], False)
+        fallback_i += 1
 
-	# maze 完成检测：完成就回收并再生成一个新的 maze
-	if maze_drone != None:
-		if has_finished(maze_drone):
-			wait_for(maze_drone)
-			maze = maze_area(MAZE_SIZE, MAZE_TIMES)
-			if maze != None:
-				maze_drone = spawn_maze_drone(maze)
-				if maze_drone == None:
-					run_maze_inline(maze)
-					maze = None
-					maze_drone = None
-			else:
-				maze_drone = None
+    # maze 完成检测：完成就回收并再生成一个新的 maze
+    if maze_drone != None:
+        if has_finished(maze_drone):
+            wait_for(maze_drone)
+            maze = maze_area(MAZE_SIZE, MAZE_TIMES)
+            if maze != None:
+                maze_drone = spawn_maze_drone(maze)
+                if maze_drone == None:
+                    run_maze_inline(maze)
+                    maze = None
+                    maze_drone = None
+            else:
+                maze_drone = None
 
-	do_a_flip()
+    do_a_flip()
